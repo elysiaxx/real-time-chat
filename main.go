@@ -14,6 +14,9 @@ func main() {
 	http.HandleFunc("/ws", server.ValidateToken(func(w http.ResponseWriter, r *http.Request) {
 		server.ServeWebSocket(hub, w, r)
 	}))
+	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		server.Login(w, r)
+	})
 
 	log.Println("Server started on :9909")
 	err := http.ListenAndServe(":9909", nil)

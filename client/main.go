@@ -11,13 +11,9 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
+	modelA "github.com/real-time-chat/internal/account/model"
+	"github.com/real-time-chat/internal/model"
 )
-
-type JsonResponse struct {
-	Code  int
-	Error error
-	Data  map[string]string
-}
 
 func generateJWT() (string, error) {
 	jwtSecret := []byte("secret_key")
@@ -36,33 +32,60 @@ func generateJWT() (string, error) {
 }
 
 func handleLogin(url string) string {
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	header := http.Header{}
+	header.Set("Content-Type", "application/json")
+	conn, _, err := websocket.DefaultDialer.Dial(url, header)
 	if err != nil {
-		log.Fatalf("Failed to connect to server: %v", err)
+		log.Fatalf("Failed to connect to %v: %v", url, err)
 	}
 	defer conn.Close()
 
-	type LoginRequest struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
+	var lr = modelA.LoginRequest{
+		Email:    "client1@gmail.com",
+		Password: "Client1@123",
 	}
-	var lr = LoginRequest{
-		Username: "zboonz",
-		Password: "abc",
-	}
-	err = conn.WriteJSON(lr)
+	err = conn.WriteJSON(&lr)
 	if err != nil {
 		log.Fatalf("Fail to send json data to server: %v", err)
 	}
-	var res JsonResponse
+	var res model.JsonResponse
 	err = conn.ReadJSON(&res)
 	if err != nil {
 		log.Fatalf("Fail to read json response from server: %v", err)
 	}
-	if res.Error != nil {
-		log.Fatalf("Fail to login to server: %v", res.Error.Error())
+	if res.Error != "" {
+		log.Fatalf("Fail to login to server: %v", res.Error)
 	}
 	return strings.TrimSpace(res.Data["token"])
+}
+
+func HandleRegister(url string) {
+	registerReq := modelA.AccountRegisterRequest{
+		Email:    "client1@gmail.com",
+		Username: "client1",
+		Password: "Client1@123",
+	}
+	header := http.Header{}
+	header.Set("Content-Type", "application/json")
+	conn, _, err := websocket.DefaultDialer.Dial(url, header)
+	if err != nil {
+		log.Fatalf("Failed to connect to %v: %v", url, err)
+	}
+	defer conn.Close()
+
+	err = conn.WriteJSON(registerReq)
+	if err != nil {
+		log.Fatalf("Fail to send register data to server: %v", err)
+	}
+	var res model.JsonResponse
+	err = conn.ReadJSON(&res)
+	if err != nil {
+		log.Fatalf("Fail to read data from server: %v", res.Error)
+	}
+	if res.Error != "" {
+		log.Fatalf("Fail to register new account: %v", res.Error)
+	}
+	log.Printf("[%v] %v\n", res.Code, res.Data)
 }
 
 func main() {
@@ -70,6 +93,9 @@ func main() {
 	serverAddr := "ws://localhost:9909/ws"
 	loginAddr := "ws://localhost:9909/login"
 	roomAddr := "?room=123"
+
+	// registerAddr := "ws://localhost:9909/register"
+	// HandleRegister(registerAddr)
 	// Login to server
 	token := handleLogin(loginAddr)
 

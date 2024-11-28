@@ -1,11 +1,16 @@
 package server
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
+	"github.com/real-time-chat/internal/account"
+	accountM "github.com/real-time-chat/internal/account/model"
+	"github.com/real-time-chat/internal/model"
 )
 
 var upgrader = websocket.Upgrader{
@@ -44,7 +49,7 @@ func ServeWebSocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	go client.WriteMessages()
 }
 
-func Login(w http.ResponseWriter, r *http.Request) {
+func Register(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
@@ -53,37 +58,85 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	w.Header().Set("Content-Type", "application/json")
-	type JsonResponse struct {
-		Code  int
-		Error error
-		Data  map[string]string
+	var ARegR accountM.AccountRegisterRequest
+	if err = conn.ReadJSON(&ARegR); err != nil {
+		log.Printf("Bad request: %s\n", err)
+		response := model.JsonResponse{
+			Code:  http.StatusInternalServerError,
+			Error: fmt.Sprintf("Bad request: %s", err.Error()),
+			Data:  make(map[string]string),
+		}
+		conn.WriteJSON(&response)
+		return
 	}
-	type LoginRequest struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	var lr LoginRequest
-	err = conn.ReadJSON(&lr)
+	err = aH.Register(&ARegR)
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		log.Printf("Fail to register: %s\n", err)
+		response := model.JsonResponse{
+			Code:  http.StatusInternalServerError,
+			Error: fmt.Sprintf("Fail to register: %s", err.Error()),
+			Data:  make(map[string]string),
+		}
+		conn.WriteJSON(&response)
 		return
 	}
 
-	if lr.Username == "zboonz" && lr.Password == "abc" {
-		token, err := GenerateJWT(lr.Username)
-		if err != nil {
-			response := JsonResponse{
-				Code:  http.StatusInternalServerError,
-				Error: err,
-				Data:  nil,
-			}
-			conn.WriteJSON(response)
-			return
+	response := model.JsonResponse{
+		Code:  http.StatusOK,
+		Error: "",
+		Data:  map[string]string{"msg": "Create a new account successfully"},
+	}
+	conn.WriteJSON(&response)
+}
+
+func Login(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+		return
+	}
+	defer conn.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var lr accountM.LoginRequest
+	err = conn.ReadJSON(&lr)
+	if err != nil {
+		response := model.JsonResponse{
+			Code:  http.StatusInternalServerError,
+			Error: fmt.Sprintf("Bad request: %s", err.Error()),
+			Data:  nil,
 		}
-		response := JsonResponse{Code: http.StatusOK, Error: nil, Data: map[string]string{"token": token}}
 
 		conn.WriteJSON(response)
-	} else {
-		http.Error(w, "Incorrect username/password", http.StatusBadRequest)
+		return
 	}
+
+	acc, err := aH.Login(&lr)
+	if err != nil {
+
+		response := model.JsonResponse{
+			Code:  http.StatusInternalServerError,
+			Error: err.Error(),
+			Data:  nil,
+		}
+
+		conn.WriteJSON(response)
+		return
+	}
+	token, err := GenerateJWT(acc.Email)
+	if err != nil {
+		log.Println("Fail to generate jwt token: ", err)
+		response := model.JsonResponse{
+			Code:  http.StatusInternalServerError,
+			Error: fmt.Sprintf("Fail to generate jwt token: %s", err.Error()),
+			Data:  nil,
+		}
+
+		conn.WriteJSON(response)
+		return
+	}
+	response := model.JsonResponse{Code: http.StatusOK, Error: "", Data: map[string]string{"token": token}}
+
+	conn.WriteJSON(response)
 }

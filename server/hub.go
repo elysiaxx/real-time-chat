@@ -6,11 +6,12 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
+	"github.com/real-time-chat/internal/model"
 )
 
 type Hub struct {
 	rooms      map[string]map[*Client]bool
-	Broadcast  chan Message
+	Broadcast  chan model.Message
 	Register   chan *Subscription
 	Unregister chan *Subscription
 	mu         sync.Mutex
@@ -25,7 +26,7 @@ func NewHub() *Hub {
 	var mu sync.Mutex
 	return &Hub{
 		rooms:      make(map[string]map[*Client]bool),
-		Broadcast:  make(chan Message),
+		Broadcast:  make(chan model.Message),
 		Register:   make(chan *Subscription),
 		Unregister: make(chan *Subscription),
 		mu:         mu,
@@ -58,12 +59,12 @@ func (h *Hub) Run() {
 
 		case msg := <-h.Broadcast:
 			h.mu.Lock()
-			for client := range h.rooms[msg.room] {
+			for client := range h.rooms[msg.Room] {
 				select {
-				case client.Send <- msg.content:
+				case client.Send <- msg.Content:
 				default:
 					close(client.Send)
-					delete(h.rooms[msg.room], client)
+					delete(h.rooms[msg.Room], client)
 				}
 			}
 			h.mu.Unlock()

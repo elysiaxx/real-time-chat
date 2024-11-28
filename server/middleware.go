@@ -47,11 +47,11 @@ func ValidateToken(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func GenerateJWT(username string) (string, error) {
+func GenerateJWT(email string) (string, error) {
 	// Tạo claims cho token
 	claims := jwt.MapClaims{
-		"username": username,
-		"exp":      time.Now().Add(time.Hour * 1).Unix(), // Token hết hạn sau 1 giờ
+		"email": email,
+		"exp":   time.Now().Add(time.Hour * 1).Unix(), // Token hết hạn sau 1 giờ
 	}
 
 	// Tạo token
@@ -60,4 +60,3 @@ func GenerateJWT(username string) (string, error) {
 	// Ký token với bí mật
 	return token.SignedString(jwtSecret)
 }
-

@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/websocket"
+	"github.com/real-time-chat/internal/model"
 )
 
 type Client struct {
@@ -24,19 +25,19 @@ func (c *Client) ReadMessages(hub *Hub, sub *Subscription) {
 		if err != nil {
 			break
 		}
-		hub.Broadcast <- Message{room: sub.room, content: msg}
+		hub.Broadcast <- model.Message{Room: sub.room, Content: msg}
 	}
 }
 
 func (c *Client) WriteMessages() {
 	defer c.Conn.Close()
 	for msg := range c.Send {
-		if err := c.Conn.WriteMessage(websocket.TextMessage, append([]byte(c.GetUsername()+": "), msg...)); err != nil {
+		if err := c.Conn.WriteMessage(websocket.TextMessage, append([]byte(c.GetUser()+": "), msg...)); err != nil {
 			break
 		}
 	}
 }
 
-func (c *Client) GetUsername() string {
-	return c.token.Claims.(jwt.MapClaims)["username"].(string)
+func (c *Client) GetUser() string {
+	return c.token.Claims.(jwt.MapClaims)["email"].(string)
 }

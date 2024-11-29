@@ -10,7 +10,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/real-time-chat/internal/account"
 	accountM "github.com/real-time-chat/internal/account/model"
+	"github.com/real-time-chat/internal/message"
 	"github.com/real-time-chat/internal/model"
+	messageM "github.com/real-time-chat/internal/message/model"
 )
 
 var upgrader = websocket.Upgrader{
@@ -29,7 +31,7 @@ func ServeWebSocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// do not need to check whether header has authorization and correct token pattern
 	tokenString := strings.Split(r.Header.Get("Authorization"), " ")[1]
 	room := r.URL.Query().Get("room")
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+	token, _ := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
 	client := &Client{
@@ -52,7 +54,13 @@ func ServeWebSocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 func Register(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+		response := model.JsonResponse{
+			Code:  http.StatusBadRequest,
+			Error: fmt.Sprintf("Could not open websocket connection: %s", err.Error()),
+			Data:  nil,
+		}
+
+		conn.WriteJSON(response)
 		return
 	}
 	defer conn.Close()
@@ -92,7 +100,13 @@ func Register(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
 func Login(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+		response := model.JsonResponse{
+			Code:  http.StatusBadRequest,
+			Error: fmt.Sprintf("Could not open websocket connection: %s", err.Error()),
+			Data:  nil,
+		}
+
+		conn.WriteJSON(response)
 		return
 	}
 	defer conn.Close()
@@ -124,7 +138,7 @@ func Login(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
 		conn.WriteJSON(response)
 		return
 	}
-	token, err := GenerateJWT(acc.Email)
+	token, err := GenerateJWT(strings.TrimSpace(acc.Email))
 	if err != nil {
 		log.Println("Fail to generate jwt token: ", err)
 		response := model.JsonResponse{
@@ -139,4 +153,37 @@ func Login(aH *account.Handler, w http.ResponseWriter, r *http.Request) {
 	response := model.JsonResponse{Code: http.StatusOK, Error: "", Data: map[string]string{"token": token}}
 
 	conn.WriteJSON(response)
+}
+
+func Transfer(mH *message.Handler, aH *account.Handler, w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		response := model.JsonResponse{
+			Code:  http.StatusBadRequest,
+			Error: fmt.Sprintf("Could not open websocket connection: %s", err.Error()),
+			Data:  nil,
+		}
+
+		conn.WriteJSON(response)
+		return
+	}
+	defer conn.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	tokenString := strings.Split(r.Header.Get("Authorization"), " ")[1]
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	if err != nil || token == nil {
+		http.Error(w, "Authenticate failure", http.StatusBadRequest)
+		return
+	}
+
+	// authenticate passed
+	// send messages
+	for {
+		m := messageM.Message{
+			Sender: ,
+		}
+	}
 }

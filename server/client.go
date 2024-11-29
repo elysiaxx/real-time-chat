@@ -25,14 +25,14 @@ func (c *Client) ReadMessages(hub *Hub, sub *Subscription) {
 		if err != nil {
 			break
 		}
-		hub.Broadcast <- model.Message{Room: sub.room, Content: msg}
+		hub.Broadcast <- model.Message{Room: sub.room, Content: msg, User: c.GetUser()}
 	}
 }
 
 func (c *Client) WriteMessages() {
 	defer c.Conn.Close()
 	for msg := range c.Send {
-		if err := c.Conn.WriteMessage(websocket.TextMessage, append([]byte(c.GetUser()+": "), msg...)); err != nil {
+		if err := c.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 			break
 		}
 	}

@@ -32,7 +32,7 @@ func ValidateToken(next http.HandlerFunc) http.HandlerFunc {
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			// check the signation algorithm
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header)
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header)
 			}
 
 			return jwtSecret, nil

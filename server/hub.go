@@ -41,18 +41,18 @@ func (h *Hub) Run() {
 		select {
 		case sub := <-h.Register:
 			h.mu.Lock()
-			if h.rooms[sub.room] == nil {
-				h.rooms[sub.room] = make(map[*Client]bool)
+			if h.rooms[string(sub.room[:])] == nil {
+				h.rooms[string(sub.room[:])] = make(map[*Client]bool)
 			}
-			h.rooms[sub.room][sub.client] = true
+			h.rooms[string(sub.room[:])][sub.client] = true
 			h.mu.Unlock()
 
 		case sub := <-h.Unregister:
 			h.mu.Lock()
-			if clients, ok := h.rooms[sub.room]; ok {
+			if clients, ok := h.rooms[string(sub.room[:])]; ok {
 				delete(clients, sub.client)
 				if len(clients) == 0 {
-					delete(h.rooms, sub.room)
+					delete(h.rooms, string(sub.room[:]))
 				}
 			}
 			h.mu.Unlock()
@@ -61,7 +61,7 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			for client := range h.rooms[msg.Room] {
 				select {
-				case client.Send <- msg.Content:
+				case client.Send <- model.MarshalMessage(&msg):
 				default:
 					close(client.Send)
 					delete(h.rooms[msg.Room], client)

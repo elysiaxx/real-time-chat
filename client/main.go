@@ -1,11 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -124,25 +124,47 @@ func main() {
 				log.Println("Error reading message:", err)
 				return
 			}
-			fmt.Printf("%s\n", message)
+			parsedMsg, err := model.UnmarshalMessage(message)
+			if err != nil {
+				log.Println("Error parse message: ", err)
+			}
+			content, err := model.ParseContent(parsedMsg.Content)
+			if err != nil {
+				log.Println("Error parse content: ", err)
+			}
+			switch content.Type {
+			case model.TextType:
+				fmt.Printf("%s: %s\n", parsedMsg.User, content.Data)
+			case model.MP3FileType:
+				fmt.Printf("%s: sent a file\n", parsedMsg.User)
+				if err := os.WriteFile("test_receive_file.mp3", content.Data, os.ModePerm); err != nil {
+					log.Println(err)
+				}
+			default:
+				fmt.Printf("%s: sent an unknown message", parsedMsg.User)
+			}
 		}
 	}()
 
 	// Đọc tin nhắn từ stdin và gửi đến server
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		text := scanner.Text()
-		if text == "exit" {
-			fmt.Println("Exiting chat...")
-			break
-		}
-
-		err := conn.WriteMessage(websocket.TextMessage, []byte(text))
-		if err != nil {
-			log.Println("Error sending message:", err)
-			break
-		}
+	rootDir, _ := os.Getwd()
+	f, err := os.ReadFile(filepath.Join(rootDir, "assets", "test_file_transfer.mp3"))
+	if err != nil {
+		log.Println("Fail to read file: ", err)
 	}
+	err = conn.WriteMessage(websocket.TextMessage, model.NewContentBytes(model.MP3FileType, f))
+	if err != nil {
+		log.Println("Error sending message:", err)
+	}
+	// scanner := bufio.NewScanner(os.Stdin)
+	// for scanner.Scan() {
+	// 	text := scanner.Text()
+	// 	if text == "exit" {
+	// 		fmt.Println("Exiting chat...")
+	// 		break
+	// 	}
+
+	// }
 
 	// Đợi goroutine đọc tin nhắn từ server hoàn tất
 	<-done
